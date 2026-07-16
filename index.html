@@ -18,18 +18,22 @@
       --text-dim:#8ea0c8;
     }
     *{box-sizing:border-box;}
-    html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:var(--bg-deep); font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif; -webkit-user-select:none; user-select:none; touch-action:none;}
+    html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:var(--bg-deep); font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif; -webkit-user-select:none; user-select:none; touch-action:none; overscroll-behavior:none;}
     #gameCanvas{display:block;width:100%;height:100%;background:var(--bg-deep);cursor:crosshair; touch-action:none;}
+    .mobile-controls,.mobile-hint{display:none;}
     @media (max-width: 900px){
-      #leaderboard{top:8px;right:8px;left:auto;min-width:0;max-width:calc(100vw - 16px);padding:10px 12px;}
-      #leaderboard h3{font-size:10px;letter-spacing:2px;}
-      #lbList{font-size:12px;}
-      #scorePanel{left:8px;bottom:8px;padding:8px 12px;}
+      #leaderboard{display:none;}
+      #scorePanel{left:10px;bottom:96px;padding:8px 12px;max-width:120px;}
       #scorePanel .big{font-size:20px;}
-      #boostBarWrap{left:8px;bottom:64px;width:130px;height:7px;}
-      #controlsHint{top:8px;left:8px;right:8px;transform:none;font-size:10px;line-height:1.4;max-width:none;}
-      #minimapWrap{width:86px;height:86px;right:8px;bottom:8px;}
-      .overlay{padding:16px;}
+      #boostBarWrap{left:10px;bottom:148px;width:132px;height:7px;}
+      #controlsHint{top:8px;left:8px;right:8px;transform:none;font-size:10px;line-height:1.35;max-width:none;padding:7px 12px;}
+      #netBadge{top:44px;left:8px;right:8px;transform:none;max-width:none;text-align:center;}
+      #minimapWrap{width:86px;height:86px;right:8px;bottom:92px;}
+      .mobile-controls{display:flex;position:absolute;right:12px;bottom:max(14px, env(safe-area-inset-bottom));z-index:6;gap:10px;pointer-events:auto;}
+      .mobile-btn{width:74px;height:74px;border:none;border-radius:50%;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-magenta));color:#fff;font-size:13px;font-weight:700;letter-spacing:1px;box-shadow:0 8px 24px rgba(0,0,0,0.35);}
+      .mobile-btn:active{transform:scale(0.96);} 
+      .mobile-hint{display:block;position:absolute;left:50%;bottom:max(96px, calc(env(safe-area-inset-bottom) + 92px));transform:translateX(-50%);z-index:6;pointer-events:none;background:rgba(4,7,16,0.7);border:1px solid var(--panel-border);color:#eaf2ff;padding:8px 12px;border-radius:999px;font-size:10px;letter-spacing:1px;text-align:center;max-width:min(88vw, 280px);}
+      .overlay{padding:16px 16px max(24px, calc(16px + env(safe-area-inset-bottom)));}
       .overlay h1{font-size:28px;letter-spacing:3px;}
       .overlay .sub{font-size:11px;letter-spacing:1px;margin-bottom:14px;}
       .nameInput,.codeInput{width:min(88vw, 260px);font-size:14px;padding:10px 14px;}
@@ -82,6 +86,10 @@
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
+  <div id="mobileControls" class="mobile-controls" aria-label="手機控制">
+    <button id="boostBtn" class="mobile-btn" type="button">加速</button>
+  </div>
+  <div id="mobileHint" class="mobile-hint">拖曳畫面轉向 · 按住加速</div>
   <div id="leaderboard" class="hud">
     <h3>戰場排行榜</h3>
     <ol id="lbList"></ol>
@@ -91,7 +99,7 @@
     <div class="big" id="scoreVal">0</div>
   </div>
   <div id="boostBarWrap" class="hud"><div id="boostBar"></div></div>
-  <div id="controlsHint" class="hud">滑鼠移動控制方向　·　左鍵 / 空白鍵 加速</div>
+  <div id="controlsHint" class="hud">拖曳 / 點擊控制方向　·　左鍵 / 空白鍵 / 按住加速</div>
   <div id="netBadge" class="hud"></div>
   <div id="minimapWrap" class="hud"><canvas id="minimapCanvas" width="140" height="140"></canvas></div>
 
@@ -200,6 +208,7 @@
       let mouse = {x:0,y:0};
       let keys = {};
       let mouseDown = false;
+      let mobileBoostPressed = false;
       let idCounter = 1;
       let hostPeer = null, joinPeer = null;
       let connections = {};
@@ -223,7 +232,7 @@
       function checkCollisions(){ for(const sn of snakes){ if (!sn.alive) continue; const hr = headRadius(sn) * 0.72; for(const other of snakes){ if (!other.alive || !other.segments || !other.segments.length) continue; if (other === sn) continue; for(let i=0;i<other.segments.length;i++){ const seg = other.segments[i]; const orad = bodyRadius(other)*0.78; const rr = hr + orad; if (dist2(sn.x, sn.y, seg.x, seg.y) < rr*rr){ killSnake(sn, other.name); break; } } if (!sn.alive) break; } } }
       function spawnAIEcosystem(){ const n = Math.floor(rand(AI_MIN, AI_MAX + 1)); for(let i=0;i<n;i++) snakes.push(makeSnake('ai')); }
       function respawnAI(oldSn){ const idx = snakes.indexOf(oldSn); const ns = makeSnake('ai'); if (idx >= 0) snakes[idx] = ns; else snakes.push(ns); }
-      function updatePlayerControl(sn){ if (!sn.alive) return; let usingKeys = false; if (keys['arrowleft'] || keys['a']){ sn.targetAngle = sn.angle - 0.9; usingKeys = true; } if (keys['arrowright'] || keys['d']){ sn.targetAngle = sn.angle + 0.9; usingKeys = true; } if (!usingKeys){ const dx = mouse.x - canvas.width/2; const dy = mouse.y - canvas.height/2; if (Math.hypot(dx, dy) > 6) sn.targetAngle = Math.atan2(dy, dx); } sn.boosting = (mouseDown || keys[' ']) && sn.length > MIN_LEN_TO_BOOST; }
+      function updatePlayerControl(sn){ if (!sn.alive) return; let usingKeys = false; if (keys['arrowleft'] || keys['a']){ sn.targetAngle = sn.angle - 0.9; usingKeys = true; } if (keys['arrowright'] || keys['d']){ sn.targetAngle = sn.angle + 0.9; usingKeys = true; } if (!usingKeys){ const dx = mouse.x - canvas.width/2; const dy = mouse.y - canvas.height/2; if (Math.hypot(dx, dy) > 6) sn.targetAngle = Math.atan2(dy, dx); } sn.boosting = (mouseDown || mobileBoostPressed || keys[' ']) && sn.length > MIN_LEN_TO_BOOST; }
       function startHost(name){ mode = 'host'; particles = []; snakes = []; connections = {}; netSnakes = {}; const self = makeSnake('self', name); mySnake = self; snakes.push(self); spawnAIEcosystem(); maintainParticles(); const code = genRoomCode(); hostPeer = new Peer(code, {debug:0}); hostPeer.on('open', id=>{ document.getElementById('hostStatus').textContent = ''; document.getElementById('roomCodeText').textContent = id; document.getElementById('roomCodeBox').style.display = 'flex'; document.getElementById('hostBtn').disabled = true; setNetBadge('房主中 · 房間代碼 ' + id + ' · 等待玩家加入'); launchGame(); }); hostPeer.on('connection', conn=>{ conn.on('open', ()=>{}); conn.on('data', data=> handleHostData(conn, data)); conn.on('close', ()=>{ removePeer(conn.peer); }); }); hostPeer.on('error', err=>{ if (err.type === 'unavailable-id'){ hostPeer.destroy(); startHost(name); } else { document.getElementById('hostStatus').textContent = '連線錯誤：' + err.type; document.getElementById('hostStatus').classList.add('errMsg'); } }); }
       function handleHostData(conn, data){ const pid = conn.peer; if (data.type === 'join'){ const pair = randColorPair(); const mirror = { id: pid, kind:'mirror', name: (data.name||'玩家').slice(0,12), isPlayer:false, colorMain: pair[0], colorDark: pair[1], x:0, y:0, angle:0, length: START_LEN, boosting:false, alive:true, segments: [], killedBy:null, hostKilled:false }; netSnakes[pid] = mirror; connections[pid] = conn; snakes.push(mirror); conn.send({type:'welcome', id: pid}); updateNetBadgeCount(); } else if (data.type === 'state'){ const mirror = netSnakes[pid]; if (!mirror || mirror.hostKilled) return; if (mirror.alive && data.alive === false){ mirror.alive = false; mirror.killedBy = data.killer || '邊界'; explodeSnake(mirror); } else if (data.alive){ mirror.x = data.x; mirror.y = data.y; mirror.angle = data.angle; mirror.length = data.length; mirror.boosting = data.boosting; mirror.alive = true; mirror.segments = data.segments || mirror.segments; } } else if (data.type === 'respawn'){ const mirror = netSnakes[pid]; if (mirror){ mirror.hostKilled=false; mirror.alive=true; mirror.length=START_LEN; mirror.killedBy=null; } } }
       function removePeer(pid){ const mirror = netSnakes[pid]; if (mirror){ const idx = snakes.indexOf(mirror); if (idx >= 0) snakes.splice(idx, 1); } delete netSnakes[pid]; delete connections[pid]; updateNetBadgeCount(); }
@@ -251,8 +260,17 @@
       canvas.addEventListener('touchend', ()=>{ mouseDown = false; });
       canvas.addEventListener('touchcancel', ()=>{ mouseDown = false; });
       window.addEventListener('mouseup', ()=>{ mouseDown = false; });
+      window.addEventListener('blur', ()=>{ keys = {}; mouseDown = false; mobileBoostPressed = false; });
       window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()] = true; if(e.key===' ') e.preventDefault(); });
       window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()] = false; });
+      const boostBtn = document.getElementById('boostBtn');
+      function setBoostPressed(value){ mobileBoostPressed = value; }
+      boostBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); setBoostPressed(true); });
+      boostBtn.addEventListener('pointerup', ()=>setBoostPressed(false));
+      boostBtn.addEventListener('pointerleave', ()=>setBoostPressed(false));
+      boostBtn.addEventListener('pointercancel', ()=>setBoostPressed(false));
+      boostBtn.addEventListener('touchend', ()=>setBoostPressed(false));
+      boostBtn.addEventListener('touchcancel', ()=>setBoostPressed(false));
       function showDeath(sn){ running = false; document.getElementById('finalScore').textContent = Math.floor(sn.length); document.getElementById('killerName').textContent = sn.killedBy || '邊界'; document.getElementById('deathOverlay').classList.remove('hidden'); }
       function launchGame(){ document.getElementById('startOverlay').classList.add('hidden'); document.getElementById('deathOverlay').classList.add('hidden'); running = true; lastTime = performance.now(); requestAnimationFrame(loop); }
       function respawn(){ const name = document.getElementById('nameInput').value.trim() || '玩家'; if (mode === 'offline'){ particles = []; snakes = []; const self = makeSnake('self', name); mySnake = self; snakes.push(self); spawnAIEcosystem(); maintainParticles(); } else if (mode === 'host'){ const self = makeSnake('self', name); const idx = snakes.indexOf(mySnake); mySnake = self; if (idx >= 0) snakes[idx] = self; else snakes.push(self); } else if (mode === 'peer'){ const self = makeSnake('self', name); mySnake = self; if (hostConn && hostConn.open) hostConn.send({type:'respawn'}); } document.getElementById('deathOverlay').classList.add('hidden'); running = true; lastTime = performance.now(); requestAnimationFrame(loop); }
