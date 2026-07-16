@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>NEON ARENA — 貪食蛇大作戰</title>
+  <style>
+    :root{
+      --bg-deep:#05060d;
+      --bg-grid:#10142a;
+      --accent-cyan:#39f2ff;
+      --accent-magenta:#ff3ec8;
+      --accent-lime:#c6ff5e;
+      --accent-amber:#ffb347;
+      --panel-bg:rgba(8,10,22,0.72);
+      --panel-border:rgba(120,180,255,0.25);
+      --text-dim:#8ea0c8;
+    }
+    *{box-sizing:border-box;}
+    html,body{
+      margin:0;padding:0;width:100%;height:100%;overflow:hidden;
+      background:var(--bg-deep);
+      font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif;
+    }
+    #gameCanvas{display:block;width:100%;height:100%;background:var(--bg-deep);cursor:crosshair;}
+    .hud{position:absolute;pointer-events:none;color:#eaf2ff;}
+    #leaderboard{
+      top:16px;right:16px;
+      background:var(--panel-bg);
+      border:1px solid var(--panel-border);
+      border-radius:10px;
+      padding:12px 16px 10px 16px;
+      min-width:190px;
+      backdrop-filter:blur(6px);
+      box-shadow:0 0 24px rgba(57,242,255,0.08);
+    }
+    #leaderboard h3{
+      margin:0 0 8px 0;font-size:12px;letter-spacing:3px;
+      color:var(--accent-cyan);font-weight:600;text-transform:uppercase;
+      border-bottom:1px solid var(--panel-border);padding-bottom:6px;
+    }
+    #lbList{list-style:none;margin:0;padding:0;font-size:13px;}
+    #lbList li{
+      display:flex;justify-content:space-between;gap:10px;
+      padding:3px 0;color:var(--text-dim);
+    }
+    #lbList li .rank{color:var(--accent-amber);width:16px;display:inline-block;font-weight:700;}
+    #lbList li.me{color:#fff;font-weight:700;}
+    #lbList li .swatch{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;}
+    #scorePanel{
+      left:16px;bottom:16px;
+      background:var(--panel-bg);
+      border:1px solid var(--panel-border);
+      border-radius:10px;
+      padding:10px 18px;
+      backdrop-filter:blur(6px);
+    }
+    #scorePanel .big{font-size:26px;font-weight:800;color:var(--accent-lime);letter-spacing:1px;}
+    #scorePanel .lbl{font-size:10px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;}
+    #boostBarWrap{
+      left:16px;bottom:78px;width:180px;height:8px;
+      background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;
+      border:1px solid var(--panel-border);
+    }
+    #boostBar{height:100%;width:100%;background:linear-gradient(90deg,var(--accent-cyan),var(--accent-magenta));transition:width .08s linear;}
+    #controlsHint{
+      left:50%;top:14px;transform:translateX(-50%);
+      font-size:12px;color:var(--text-dim);letter-spacing:1px;
+      background:var(--panel-bg);border:1px solid var(--panel-border);
+      padding:6px 14px;border-radius:20px;
+    }
+    #minimapWrap{
+      right:16px;bottom:16px;width:140px;height:140px;
+      background:var(--panel-bg);border:1px solid var(--panel-border);
+      border-radius:50%;overflow:hidden;
+    }
+    #minimapCanvas{width:100%;height:100%;}
+    .overlay{
+      position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 50% 40%,rgba(20,10,40,0.9),rgba(3,3,8,0.97));
+      flex-direction:column;text-align:center;
+    }
+    .overlay.hidden{display:none;}
+    .overlay h1{
+      font-size:44px;margin:0 0 6px 0;letter-spacing:6px;
+      color:#fff;text-shadow:0 0 18px var(--accent-magenta),0 0 40px var(--accent-cyan);
+    }
+    .overlay .sub{color:var(--text-dim);font-size:14px;margin-bottom:26px;letter-spacing:2px;}
+    .overlay .statline{color:#fff;font-size:16px;margin-bottom:4px;}
+    .overlay .statline b{color:var(--accent-lime);font-size:20px;}
+    .nameInput{
+      margin:18px 0;padding:10px 16px;font-size:15px;border-radius:8px;
+      border:1px solid var(--panel-border);background:rgba(255,255,255,0.06);
+      color:#fff;text-align:center;width:220px;outline:none;
+    }
+    .nameInput:focus{border-color:var(--accent-cyan);}
+    .playBtn{
+      margin-top:10px;padding:14px 40px;font-size:16px;font-weight:700;letter-spacing:2px;
+      border:none;border-radius:30px;cursor:pointer;color:#050308;
+      background:linear-gradient(90deg,var(--accent-lime),var(--accent-cyan));
+      box-shadow:0 0 24px rgba(57,242,255,0.5);
+      transition:transform .12s ease, box-shadow .12s ease;
+    }
+    .playBtn:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 0 34px rgba(57,242,255,0.75);}
+    .playBtn:active{transform:translateY(0) scale(0.98);}
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="leaderboard" class="hud">
+    <h3>戰場排行榜</h3>
+    <ol id="lbList"></ol>
+  </div>
+  <div id="scorePanel" class="hud">
+    <div class="lbl">目前長度</div>
+    <div class="big" id="scoreVal">0</div>
+  </div>
+  <div id="boostBarWrap" class="hud"><div id="boostBar"></div></div>
+  <div id="controlsHint" class="hud">滑鼠移動控制方向　·　左鍵 / 空白鍵 加速</div>
+  <div id="minimapWrap" class="hud"><canvas id="minimapCanvas" width="140" height="140"></canvas></div>
+  <div class="overlay" id="startOverlay">
+    <h1>NEON ARENA</h1>
+    <div class="sub">貪食蛇大作戰 · 吃光敵人，稱霸戰場</div>
+    <input class="nameInput" id="nameInput" maxlength="12" placeholder="輸入你的蛇名" value="玩家">
+    <button class="playBtn" id="startBtn">進入戰局</button>
+  </div>
+  <div class="overlay hidden" id="deathOverlay">
+    <h1 style="font-size:34px;letter-spacing:4px;">你被擊殺了</h1>
+    <div class="statline">最終長度 <b id="finalScore">0</b></div>
+    <div class="statline">擊殺你的是 <b id="killerName">未知</b></div>
+    <button class="playBtn" id="respawnBtn" style="margin-top:22px;">重新加入戰局</button>
+  </div>
+  <script>
+    (function(){
+      'use strict';
+
+      // ---------- CONFIG ----------
+      const WORLD_R = 1500;
+      const AI_COUNT = 8;
+      const PARTICLE_TARGET = 1800;
+      const PARTICLE_MIN = 1200;
+      const SEG_SPACING = 5.5;
+      const BASE_SPEED = 145;
+      const BOOST_SPEED = 290;
+      const TURN_RATE = 4.6;
+      const MIN_LEN_TO_BOOST = 60;
+      const BOOST_DRAIN = 34;
+      const START_LEN = 90;
+      const NAMES = ["夜梟","霓虹刃","電光","幻影狐","極光","獵風","銀翼","赤炎蛱","狂蛇","冰刃","流星","暗涌","雷鳴","紫電","幽靈蛇"];
+      const COLORS = [
+        ["#39f2ff", "#0a6b7a"],
+        ["#ff3ec8", "#7a0a55"],
+        ["#c6ff5e", "#5a7a0a"],
+        ["#ffb347", "#7a4a0a"],
+        ["#b06bff", "#4a0a7a"],
+        ["#ff5e5e", "#7a0a0a"],
+        ["#5eeaff", "#0a5a7a"],
+        ["#ffe45e", "#7a6a0a"],
+        ["#5eff9e", "#0a7a3a"],
+        ["#ff8ac2", "#7a0a4a"]
+      ];
+
+      // ---------- CANVAS ----------
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const mini = document.getElementById('minimapCanvas');
+      const mctx = mini.getContext('2d');
+      function resize(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+      window.addEventListener('resize', resize);
+      resize();
+
+      // ---------- UTIL ----------
+      function rand(a,b){ return a + Math.random()*(b-a); }
+      function dist2(x1,y1,x2,y2){ const dx=x1-x2, dy=y1-y2; return dx*dx+dy*dy; }
+      function angleLerp(cur, target, maxDelta){
+        let diff = target - cur;
+        while(diff > Math.PI) diff -= Math.PI*2;
+        while(diff < -Math.PI) diff += Math.PI*2;
+        if (diff > maxDelta) diff = maxDelta;
+        if (diff < -maxDelta) diff = -maxDelta;
+        return cur + diff;
+      }
+      function randColorPair(){ return COLORS[Math.floor(Math.random()*COLORS.length)]; }
+
+      // ---------- STATE ----------
+      let particles = [];
+      let snakes = [];
+      let player = null;
+      let running = false;
+      let lastTime = 0;
+      let mouse = {x:0,y:0};
+      let keys = {};
+      let mouseDown = false;
+      let idCounter = 1;
+
+      // ---------- PARTICLES ----------
+      function spawnParticle(px, py, big){
+        let x,y;
+        if (px !== undefined){ x = px; y = py; }
+        else {
+          const ang = Math.random()*Math.PI*2;
+          const r = Math.sqrt(Math.random())*WORLD_R*0.98;
+          x = Math.cos(ang)*r; y = Math.sin(ang)*r;
+        }
+        const pair = randColorPair();
+        const value = big ? rand(6,14) : rand(1,3.2);
+        particles.push({
+          x,y,
+          r: big ? rand(4.5,7) : rand(2,3.4),
+          color: pair[0],
+          value
+        });
+      }
+      function maintainParticles(){
+        if (particles.length < PARTICLE_MIN){
+          while(particles.length < PARTICLE_TARGET) spawnParticle();
+        }
+      }
+      function explodeSnake(sn){
+        const baseCount = Math.min(60, Math.max(14, Math.floor(sn.length/6)));
+        const totalCount = Math.min(280, baseCount * 4);
+        const pileCount = Math.floor(totalCount * 0.65);
+        for(let i=0;i<pileCount;i++){
+          const ang = Math.random()*Math.PI*2;
+          const rad = Math.random()*30;
+          particles.push({
+            x: sn.x + Math.cos(ang)*rad,
+            y: sn.y + Math.sin(ang)*rad,
+            r: rand(3.5,7),
+            color: sn.colorMain,
+            value: rand(3,9)
+          });
+        }
+        const trailCount = totalCount - pileCount;
+        for(let i=0;i<trailCount;i++){
+          const seg = sn.segments[Math.floor(Math.random()*sn.segments.length)] || sn.segments[0];
+          const ang = Math.random()*Math.PI*2;
+          const rad = Math.random()*22;
+          particles.push({
+            x: seg.x + Math.cos(ang)*rad,
+            y: seg.y + Math.sin(ang)*rad,
+            r: rand(3.5,6.5),
+            color: sn.colorMain,
+            value: rand(3,8)
+          });
+        }
+      }
+
+      // ---------- SNAKE ----------
+      function makeSnake(isPlayer, name){
+        const pair = randColorPair();
+        const ang = Math.random()*Math.PI*2;
+        const spawnR = Math.random()*WORLD_R*0.6;
+        const sx = Math.cos(ang)*spawnR, sy = Math.sin(ang)*spawnR;
+        const heading = Math.random()*Math.PI*2;
+        const sn = {
+          id: idCounter++,
+          name: name || NAMES[Math.floor(Math.random()*NAMES.length)],
+          isPlayer,
+          colorMain: pair[0],
+          colorDark: pair[1],
+          x: sx, y: sy,
+          angle: heading,
+          targetAngle: heading,
+          length: START_LEN,
+          speed: BASE_SPEED,
+          boosting: false,
+          alive: true,
+          path: [],
+          segments: [],
+          wanderTimer: 0,
+          wanderAngle: heading,
+          killedBy: null,
+        };
+        for(let i=0;i<400;i++) sn.path.push({x:sx - Math.cos(heading)*i*SEG_SPACING, y: sy - Math.sin(heading)*i*SEG_SPACING});
+        rebuildSegments(sn);
+        return sn;
+      }
+
+      function headRadius(sn){ return Math.min(20, 6.5 + Math.sqrt(sn.length)*0.62); }
+      function bodyRadius(sn){ return headRadius(sn)*0.86; }
+
+      function rebuildSegments(sn){
+        const needed = Math.max(6, Math.floor(sn.length / SEG_SPACING));
+        const segs = [];
+        for(let i=0;i<needed;i++){
+          const p = sn.path[Math.min(i, sn.path.length-1)];
+          if (p) segs.push(p);
+        }
+        sn.segments = segs;
+      }
+
+      function aiThink(sn, dt){
+        let best = null, bestScore = -Infinity;
+        const visionR2 = 380*380;
+        for(let i=0;i<particles.length;i++){
+          const p = particles[i];
+          const d2 = dist2(sn.x,sn.y,p.x,p.y);
+          if (d2 < visionR2){
+            const score = p.value/(Math.sqrt(d2)+30);
+            if (score > bestScore){ bestScore = score; best = p; }
+          }
+        }
+        let desired;
+        if (best){
+          desired = Math.atan2(best.y - sn.y, best.x - sn.x);
+        } else {
+          sn.wanderTimer -= dt;
+          if (sn.wanderTimer <= 0){
+            sn.wanderAngle = sn.angle + rand(-1.2,1.2);
+            sn.wanderTimer = rand(1.2,2.6);
+          }
+          desired = sn.wanderAngle;
+        }
+        const distFromCenter = Math.hypot(sn.x, sn.y);
+        if (distFromCenter > WORLD_R*0.86){
+          const toCenter = Math.atan2(-sn.y, -sn.x);
+          desired = toCenter;
+        }
+        const lookX = sn.x + Math.cos(sn.angle)*70;
+        const lookY = sn.y + Math.sin(sn.angle)*70;
+        for(const other of snakes){
+          if (other === sn || !other.alive) continue;
+          const startIdx = other === sn ? 10 : 0;
+          for(let i=startIdx;i<other.segments.length;i+=3){
+            const seg = other.segments[i];
+            const d2 = dist2(lookX,lookY,seg.x,seg.y);
+            if (d2 < 40*40){
+              const away = Math.atan2(sn.y-seg.y, sn.x-seg.x);
+              desired = angleLerp(desired, away, 2.5);
+              break;
+            }
+          }
+        }
+        sn.targetAngle = desired;
+        sn.boosting = Math.random() < 0.002 && sn.length > MIN_LEN_TO_BOOST + 30;
+      }
+
+      function updateSnake(sn, dt){
+        if (!sn.alive) return;
+        sn.angle = angleLerp(sn.angle, sn.targetAngle, TURN_RATE*dt);
+
+        const wantBoost = sn.boosting && sn.length > MIN_LEN_TO_BOOST;
+        sn.speed = wantBoost ? BOOST_SPEED : BASE_SPEED;
+        if (wantBoost){
+          sn.length = Math.max(MIN_LEN_TO_BOOST, sn.length - BOOST_DRAIN*dt);
+          if (Math.random() < 0.6){
+            const back = sn.angle + Math.PI;
+            particles.push({
+              x: sn.x + Math.cos(back)*headRadius(sn),
+              y: sn.y + Math.sin(back)*headRadius(sn),
+              r: rand(1.5,2.6), color: sn.colorMain, value: 0.6, ephemeral:true, life: 0.6
+            });
+          }
+        }
+
+        sn.x += Math.cos(sn.angle) * sn.speed * dt;
+        sn.y += Math.sin(sn.angle) * sn.speed * dt;
+
+        sn.path.unshift({x:sn.x, y:sn.y});
+        const maxPts = Math.floor(sn.length/SEG_SPACING) + 20;
+        if (sn.path.length > maxPts) sn.path.length = maxPts;
+        rebuildSegments(sn);
+
+        if (Math.hypot(sn.x, sn.y) > WORLD_R + 10){
+          killSnake(sn, "邊界");
+        }
+
+        const hr = headRadius(sn);
+        for(let i=particles.length-1;i>=0;i--){
+          const p = particles[i];
+          const rr = hr + p.r;
+          if (dist2(sn.x,sn.y,p.x,p.y) < rr*rr){
+            sn.length += p.value;
+            particles.splice(i,1);
+          }
+        }
+      }
+
+      function killSnake(sn, killerName){
+        if (!sn.alive) return;
+        sn.alive = false;
+        sn.killedBy = killerName;
+        explodeSnake(sn);
+        if (sn.isPlayer){
+          showDeath(sn);
+        } else {
+          setTimeout(()=>{ respawnAI(sn); }, rand(600,1400));
+        }
+      }
+
+      function checkCollisions(){
+        for(const sn of snakes){
+          if (!sn.alive) continue;
+          const hr = headRadius(sn) * 0.72;
+          for(const other of snakes){
+            if (!other.alive) continue;
+            if (other === sn) continue;
+            for(let i=0;i<other.segments.length;i++){
+              const seg = other.segments[i];
+              const orad = bodyRadius(other)*0.78;
+              const rr = hr + orad;
+              if (dist2(sn.x,sn.y,seg.x,seg.y) < rr*rr){
+                killSnake(sn, other.name);
+                break;
+              }
+            }
+            if (!sn.alive) break;
+          }
+        }
+      }
+
+      function respawnAI(oldSn){
+        const idx = snakes.indexOf(oldSn);
+        const ns = makeSnake(false);
+        if (idx>=0) snakes[idx] = ns; else snakes.push(ns);
+      }
+
+      // ---------- PLAYER CONTROL ----------
+      function updatePlayerControl(sn){
+        if (!sn.alive) return;
+        let usingKeys = false;
+        if (keys['arrowleft'] || keys['a']){ sn.targetAngle = sn.angle - 0.9; usingKeys = true; }
+        if (keys['arrowright'] || keys['d']){ sn.targetAngle = sn.angle + 0.9; usingKeys = true; }
+        if (!usingKeys){
+          const dx = mouse.x - canvas.width/2;
+          const dy = mouse.y - canvas.height/2;
+          if (Math.hypot(dx,dy) > 6){
+            sn.targetAngle = Math.atan2(dy,dx);
+          }
+        }
+        sn.boosting = (mouseDown || keys[' ']) && sn.length > MIN_LEN_TO_BOOST;
+      }
+
+      // ---------- RENDER ----------
+      function drawBackground(camX, camY){
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-deep');
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+
+        const gridSize = 60;
+        ctx.strokeStyle = 'rgba(90,120,200,0.08)';
+        ctx.lineWidth = 1;
+        const offX = -((camX) % gridSize);
+        const offY = -((camY) % gridSize);
+        for(let x = offX; x < canvas.width; x += gridSize){
+          ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
+        }
+        for(let y = offY; y < canvas.height; y += gridSize){
+          ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
+        }
+
+        ctx.save();
+        ctx.translate(canvas.width/2 - camX, canvas.height/2 - camY);
+        ctx.beginPath();
+        ctx.arc(0,0,WORLD_R,0,Math.PI*2);
+        ctx.strokeStyle = 'rgba(255,60,120,0.55)';
+        ctx.lineWidth = 6;
+        ctx.shadowColor = '#ff3ec8';
+        ctx.shadowBlur = 25;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+
+      function drawParticles(camX,camY){
+        for(let i=particles.length-1;i>=0;i--){
+          const p = particles[i];
+          if (p.ephemeral){
+            p.life -= 0.016;
+            if (p.life <= 0){ particles.splice(i,1); continue; }
+          }
+          const sx = p.x - camX + canvas.width/2;
+          const sy = p.y - camY + canvas.height/2;
+          if (sx < -20 || sx > canvas.width+20 || sy < -20 || sy > canvas.height+20) continue;
+          ctx.beginPath();
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 10;
+          ctx.arc(sx, sy, p.r, 0, Math.PI*2);
+          ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+      }
+
+      function drawSnake(sn, camX, camY){
+        if (!sn.alive) return;
+        const segs = sn.segments;
+        const br = bodyRadius(sn);
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+        ctx.beginPath();
+        for(let i=segs.length-1;i>=0;i--){
+          const sx = segs[i].x - camX + canvas.width/2;
+          const sy = segs[i].y - camY + canvas.height/2;
+          if (i===segs.length-1) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy);
+        }
+        ctx.strokeStyle = sn.colorDark;
+        ctx.lineWidth = br*2.1;
+        ctx.shadowColor = sn.colorMain;
+        ctx.shadowBlur = 18;
+        ctx.globalAlpha = 0.55;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        ctx.beginPath();
+        for(let i=segs.length-1;i>=0;i--){
+          const sx = segs[i].x - camX + canvas.width/2;
+          const sy = segs[i].y - camY + canvas.height/2;
+          if (i===segs.length-1) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy);
+        }
+        ctx.strokeStyle = sn.colorMain;
+        ctx.lineWidth = br*1.6;
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        const hr = headRadius(sn);
+        const hx = sn.x - camX + canvas.width/2;
+        const hy = sn.y - camY + canvas.height/2;
+        ctx.beginPath();
+        ctx.fillStyle = sn.colorMain;
+        ctx.shadowColor = sn.colorMain;
+        ctx.shadowBlur = 20;
+        ctx.arc(hx,hy,hr,0,Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        const eyeOff = hr*0.5;
+        const ex1 = hx + Math.cos(sn.angle-0.6)*eyeOff;
+        const ey1 = hy + Math.sin(sn.angle-0.6)*eyeOff;
+        const ex2 = hx + Math.cos(sn.angle+0.6)*eyeOff;
+        const ey2 = hy + Math.sin(sn.angle+0.6)*eyeOff;
+        ctx.fillStyle = '#0a0a12';
+        ctx.beginPath(); ctx.arc(ex1,ey1,hr*0.22,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ex2,ey2,hr*0.22,0,Math.PI*2); ctx.fill();
+
+        ctx.font = '12px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.fillText(sn.name, hx, hy - hr - 10);
+      }
+
+      function drawMinimap(){
+        mctx.clearRect(0,0,140,140);
+        mctx.fillStyle = 'rgba(10,14,30,0.6)';
+        mctx.beginPath(); mctx.arc(70,70,68,0,Math.PI*2); mctx.fill();
+        const scale = 68/WORLD_R;
+        for(const sn of snakes){
+          if (!sn.alive) continue;
+          mctx.fillStyle = sn.isPlayer ? '#ffffff' : sn.colorMain;
+          const mx = 70 + sn.x*scale, my = 70 + sn.y*scale;
+          mctx.beginPath(); mctx.arc(mx,my, sn.isPlayer?3.5:2, 0, Math.PI*2); mctx.fill();
+        }
+      }
+
+      // ---------- UI UPDATE ----------
+      function updateHUD(){
+        if (player){
+          document.getElementById('scoreVal').textContent = Math.floor(player.length);
+          const pct = player.length > MIN_LEN_TO_BOOST ? 100 : Math.max(0, (player.length/MIN_LEN_TO_BOOST)*100);
+          document.getElementById('boostBar').style.width = pct + '%';
+        }
+        const ranked = snakes.filter(s=>s.alive).sort((a,b)=>b.length-a.length).slice(0,5);
+        const list = document.getElementById('lbList');
+        list.innerHTML = '';
+        ranked.forEach((sn,i)=>{
+          const li = document.createElement('li');
+          if (sn.isPlayer) li.classList.add('me');
+          li.innerHTML = `<span><span class="rank">${i+1}</span><span class="swatch" style="background:${sn.colorMain}"></span>${sn.name}</span><span>${Math.floor(sn.length)}</span>`;
+          list.appendChild(li);
+        });
+      }
+
+      // ---------- GAME LOOP ----------
+      function loop(ts){
+        if (!running) return;
+        const dt = Math.min(0.05, (ts - lastTime)/1000 || 0.016);
+        lastTime = ts;
+
+        if (player) updatePlayerControl(player);
+        for(const sn of snakes){
+          if (sn.isPlayer) continue;
+          if (sn.alive) aiThink(sn, dt);
+        }
+        for(const sn of snakes) updateSnake(sn, dt);
+        checkCollisions();
+        maintainParticles();
+
+        const camX = player ? player.x : 0;
+        const camY = player ? player.y : 0;
+        drawBackground(camX,camY);
+        drawParticles(camX,camY);
+        const order = snakes.slice().sort((a,b)=> (a.length) - (b.length));
+        for(const sn of order) drawSnake(sn, camX, camY);
+        drawMinimap();
+        updateHUD();
+
+        requestAnimationFrame(loop);
+      }
+
+      // ---------- INPUT ----------
+      canvas.addEventListener('mousemove', e=>{ mouse.x = e.clientX; mouse.y = e.clientY; });
+      canvas.addEventListener('mousedown', ()=>{ mouseDown = true; });
+      window.addEventListener('mouseup', ()=>{ mouseDown = false; });
+      window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()] = true; if(e.key===' ') e.preventDefault(); });
+      window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()] = false; });
+
+      // ---------- FLOW ----------
+      function showDeath(sn){
+        running = false;
+        document.getElementById('finalScore').textContent = Math.floor(sn.length);
+        document.getElementById('killerName').textContent = sn.killedBy || '邊界';
+        document.getElementById('deathOverlay').classList.remove('hidden');
+      }
+
+      function startGame(){
+        particles = [];
+        snakes = [];
+        const nameVal = document.getElementById('nameInput').value.trim() || '玩家';
+        player = makeSnake(true, nameVal);
+        snakes.push(player);
+        for(let i=0;i<AI_COUNT;i++) snakes.push(makeSnake(false));
+        maintainParticles();
+        document.getElementById('startOverlay').classList.add('hidden');
+        document.getElementById('deathOverlay').classList.add('hidden');
+        running = true;
+        lastTime = performance.now();
+        requestAnimationFrame(loop);
+      }
+
+      document.getElementById('startBtn').addEventListener('click', startGame);
+      document.getElementById('respawnBtn').addEventListener('click', startGame);
+      document.getElementById('nameInput').addEventListener('keydown', e=>{ if(e.key==='Enter') startGame(); });
+
+    })();
+  </script>
+</body>
+</html>
