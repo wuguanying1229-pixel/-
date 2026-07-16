@@ -20,7 +20,7 @@
     *{box-sizing:border-box;}
     html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:var(--bg-deep); font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif; -webkit-user-select:none; user-select:none; touch-action:none; overscroll-behavior:none;}
     #gameCanvas{display:block;width:100%;height:100%;background:var(--bg-deep);cursor:crosshair; touch-action:none;}
-    .mobile-controls,.mobile-hint{display:none;}
+    .mobile-controls,.mobile-hint,.mobile-joystick{display:none;}
     @media (max-width: 900px){
       #leaderboard{display:none;}
       #scorePanel{left:10px;bottom:96px;padding:8px 12px;max-width:120px;}
@@ -31,8 +31,10 @@
       #minimapWrap{width:86px;height:86px;right:8px;bottom:92px;}
       .mobile-controls{display:flex;position:absolute;right:12px;bottom:max(14px, env(safe-area-inset-bottom));z-index:6;gap:10px;pointer-events:auto;}
       .mobile-btn{width:74px;height:74px;border:none;border-radius:50%;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-magenta));color:#fff;font-size:13px;font-weight:700;letter-spacing:1px;box-shadow:0 8px 24px rgba(0,0,0,0.35);}
-      .mobile-btn:active{transform:scale(0.96);} 
-      .mobile-hint{display:block;position:absolute;left:50%;bottom:max(96px, calc(env(safe-area-inset-bottom) + 92px));transform:translateX(-50%);z-index:6;pointer-events:none;background:rgba(4,7,16,0.7);border:1px solid var(--panel-border);color:#eaf2ff;padding:8px 12px;border-radius:999px;font-size:10px;letter-spacing:1px;text-align:center;max-width:min(88vw, 280px);}
+      .mobile-btn:active{transform:scale(0.96);}       .mobile-joystick{display:flex;position:absolute;left:14px;bottom:max(18px, calc(env(safe-area-inset-bottom) + 16px));z-index:7;pointer-events:auto;}
+      .joystick-base{width:118px;height:118px;border-radius:50%;background:rgba(4,7,16,0.58);border:1px solid rgba(255,255,255,0.16);box-shadow:inset 0 0 0 10px rgba(255,255,255,0.04),0 10px 24px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;position:relative;}
+      .joystick-base::before{content:'';position:absolute;inset:18px;border-radius:50%;border:1px dashed rgba(255,255,255,0.16);} 
+      .joystick-knob{width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-magenta));box-shadow:0 8px 18px rgba(0,0,0,0.28);transform:translate(0,0);transition:transform .08s ease-out;}      .mobile-hint{display:block;position:absolute;left:50%;bottom:max(96px, calc(env(safe-area-inset-bottom) + 92px));transform:translateX(-50%);z-index:6;pointer-events:none;background:rgba(4,7,16,0.7);border:1px solid var(--panel-border);color:#eaf2ff;padding:8px 12px;border-radius:999px;font-size:10px;letter-spacing:1px;text-align:center;max-width:min(88vw, 280px);}
       .overlay{padding:16px 16px max(24px, calc(16px + env(safe-area-inset-bottom)));}
       .overlay h1{font-size:28px;letter-spacing:3px;}
       .overlay .sub{font-size:11px;letter-spacing:1px;margin-bottom:14px;}
@@ -86,6 +88,11 @@
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
+  <div id="joystickArea" class="mobile-joystick" aria-label="方向搖桿">
+    <div id="joystickBase" class="joystick-base">
+      <div id="joystickKnob" class="joystick-knob"></div>
+    </div>
+  </div>
   <div id="mobileControls" class="mobile-controls" aria-label="手機控制">
     <button id="boostBtn" class="mobile-btn" type="button">加速</button>
   </div>
@@ -210,6 +217,7 @@
       let keys = {};
       let mouseDown = false;
       let mobileBoostPressed = false;
+      let joystick = { active:false, x:0, y:0 };
       let idCounter = 1;
       let hostPeer = null, joinPeer = null;
       let connections = {};
@@ -233,7 +241,7 @@
       function checkCollisions(){ for(const sn of snakes){ if (!sn.alive) continue; const hr = headRadius(sn) * 0.72; for(const other of snakes){ if (!other.alive || !other.segments || !other.segments.length) continue; if (other === sn) continue; for(let i=0;i<other.segments.length;i++){ const seg = other.segments[i]; const orad = bodyRadius(other)*0.78; const rr = hr + orad; if (dist2(sn.x, sn.y, seg.x, seg.y) < rr*rr){ killSnake(sn, other.name); break; } } if (!sn.alive) break; } } }
       function spawnAIEcosystem(){ const n = Math.floor(rand(AI_MIN, AI_MAX + 1)); for(let i=0;i<n;i++) snakes.push(makeSnake('ai')); }
       function respawnAI(oldSn){ const idx = snakes.indexOf(oldSn); const ns = makeSnake('ai'); if (idx >= 0) snakes[idx] = ns; else snakes.push(ns); }
-      function updatePlayerControl(sn){ if (!sn.alive) return; let usingKeys = false; if (keys['arrowleft'] || keys['a']){ sn.targetAngle = sn.angle - 0.9; usingKeys = true; } if (keys['arrowright'] || keys['d']){ sn.targetAngle = sn.angle + 0.9; usingKeys = true; } if (!usingKeys){ const viewport = getCanvasViewport(); const dx = mouse.x - viewport.width/2; const dy = mouse.y - viewport.height/2; if (Math.hypot(dx, dy) > 6) sn.targetAngle = Math.atan2(dy, dx); } sn.boosting = (mouseDown || mobileBoostPressed || keys[' ']) && sn.length > MIN_LEN_TO_BOOST; }
+      function updatePlayerControl(sn){ if (!sn.alive) return; let usingKeys = false; if (keys['arrowleft'] || keys['a']){ sn.targetAngle = sn.angle - 0.9; usingKeys = true; } if (keys['arrowright'] || keys['d']){ sn.targetAngle = sn.angle + 0.9; usingKeys = true; } if (joystick.active && Math.hypot(joystick.x, joystick.y) > 0.12){ sn.targetAngle = Math.atan2(joystick.y, joystick.x); usingKeys = true; } if (!usingKeys){ const viewport = getCanvasViewport(); const dx = mouse.x - viewport.width/2; const dy = mouse.y - viewport.height/2; if (Math.hypot(dx, dy) > 6) sn.targetAngle = Math.atan2(dy, dx); } sn.boosting = (mouseDown || mobileBoostPressed || keys[' ']) && sn.length > MIN_LEN_TO_BOOST; }
       function startHost(name){ mode = 'host'; particles = []; snakes = []; connections = {}; netSnakes = {}; const self = makeSnake('self', name); mySnake = self; snakes.push(self); spawnAIEcosystem(); maintainParticles(); const code = genRoomCode(); hostPeer = new Peer(code, {debug:0}); hostPeer.on('open', id=>{ document.getElementById('hostStatus').textContent = ''; document.getElementById('roomCodeText').textContent = id; document.getElementById('roomCodeBox').style.display = 'flex'; document.getElementById('hostBtn').disabled = true; setNetBadge('房主中 · 房間代碼 ' + id + ' · 等待玩家加入'); launchGame(); }); hostPeer.on('connection', conn=>{ conn.on('open', ()=>{}); conn.on('data', data=> handleHostData(conn, data)); conn.on('close', ()=>{ removePeer(conn.peer); }); }); hostPeer.on('error', err=>{ if (err.type === 'unavailable-id'){ hostPeer.destroy(); startHost(name); } else { document.getElementById('hostStatus').textContent = '連線錯誤：' + err.type; document.getElementById('hostStatus').classList.add('errMsg'); } }); }
       function handleHostData(conn, data){ const pid = conn.peer; if (data.type === 'join'){ const pair = randColorPair(); const mirror = { id: pid, kind:'mirror', name: (data.name||'玩家').slice(0,12), isPlayer:false, colorMain: pair[0], colorDark: pair[1], x:0, y:0, angle:0, length: START_LEN, boosting:false, alive:true, segments: [], killedBy:null, hostKilled:false }; netSnakes[pid] = mirror; connections[pid] = conn; snakes.push(mirror); conn.send({type:'welcome', id: pid}); updateNetBadgeCount(); } else if (data.type === 'state'){ const mirror = netSnakes[pid]; if (!mirror || mirror.hostKilled) return; if (mirror.alive && data.alive === false){ mirror.alive = false; mirror.killedBy = data.killer || '邊界'; explodeSnake(mirror); } else if (data.alive){ mirror.x = data.x; mirror.y = data.y; mirror.angle = data.angle; mirror.length = data.length; mirror.boosting = data.boosting; mirror.alive = true; mirror.segments = data.segments || mirror.segments; } } else if (data.type === 'respawn'){ const mirror = netSnakes[pid]; if (mirror){ mirror.hostKilled=false; mirror.alive=true; mirror.length=START_LEN; mirror.killedBy=null; } } }
       function removePeer(pid){ const mirror = netSnakes[pid]; if (mirror){ const idx = snakes.indexOf(mirror); if (idx >= 0) snakes.splice(idx, 1); } delete netSnakes[pid]; delete connections[pid]; updateNetBadgeCount(); }
@@ -265,6 +273,8 @@
       window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()] = true; if(e.key===' ') e.preventDefault(); });
       window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()] = false; });
       const boostBtn = document.getElementById('boostBtn');
+      const joystickBase = document.getElementById('joystickBase');
+      const joystickKnob = document.getElementById('joystickKnob');
       function setBoostPressed(value){ mobileBoostPressed = value; }
       boostBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); setBoostPressed(true); });
       boostBtn.addEventListener('pointerup', ()=>setBoostPressed(false));
@@ -272,6 +282,15 @@
       boostBtn.addEventListener('pointercancel', ()=>setBoostPressed(false));
       boostBtn.addEventListener('touchend', ()=>setBoostPressed(false));
       boostBtn.addEventListener('touchcancel', ()=>setBoostPressed(false));
+      function updateJoystickVisual(x, y){ const maxRadius = 42; const clampedX = Math.max(-1, Math.min(1, x)); const clampedY = Math.max(-1, Math.min(1, y)); const px = clampedX * maxRadius; const py = clampedY * maxRadius; joystickKnob.style.transform = `translate(${px}px, ${py}px)`; }
+      function resetJoystick(){ joystick.active = false; joystick.x = 0; joystick.y = 0; updateJoystickVisual(0, 0); }
+      function handleJoystickMove(clientX, clientY){ const rect = joystickBase.getBoundingClientRect(); const centerX = rect.left + rect.width/2; const centerY = rect.top + rect.height/2; const dx = clientX - centerX; const dy = clientY - centerY; const maxRadius = rect.width / 2 - 18; const dist = Math.min(maxRadius, Math.hypot(dx, dy)); const angle = Math.atan2(dy, dx); joystick.active = true; joystick.x = Math.cos(angle) * (dist / maxRadius || 0); joystick.y = Math.sin(angle) * (dist / maxRadius || 0); if (maxRadius <= 0) { joystick.x = 0; joystick.y = 0; } updateJoystickVisual(joystick.x, joystick.y); }
+      joystickBase.addEventListener('pointerdown', e=>{ e.preventDefault(); joystickBase.setPointerCapture(e.pointerId); handleJoystickMove(e.clientX, e.clientY); });
+      joystickBase.addEventListener('pointermove', e=>{ if (!joystick.active) return; handleJoystickMove(e.clientX, e.clientY); });
+      joystickBase.addEventListener('pointerup', ()=>resetJoystick());
+      joystickBase.addEventListener('pointercancel', ()=>resetJoystick());
+      joystickBase.addEventListener('pointerleave', ()=>{ if (!joystick.active) return; resetJoystick(); });
+      window.addEventListener('blur', ()=>{ keys = {}; mouseDown = false; mobileBoostPressed = false; resetJoystick(); });
       function showDeath(sn){ running = false; document.getElementById('finalScore').textContent = Math.floor(sn.length); document.getElementById('killerName').textContent = sn.killedBy || '邊界'; document.getElementById('deathOverlay').classList.remove('hidden'); }
       function launchGame(){ document.getElementById('startOverlay').classList.add('hidden'); document.getElementById('deathOverlay').classList.add('hidden'); running = true; lastTime = performance.now(); requestAnimationFrame(loop); }
       function respawn(){ const name = document.getElementById('nameInput').value.trim() || '玩家'; if (mode === 'offline'){ particles = []; snakes = []; const self = makeSnake('self', name); mySnake = self; snakes.push(self); spawnAIEcosystem(); maintainParticles(); } else if (mode === 'host'){ const self = makeSnake('self', name); const idx = snakes.indexOf(mySnake); mySnake = self; if (idx >= 0) snakes[idx] = self; else snakes.push(self); } else if (mode === 'peer'){ const self = makeSnake('self', name); mySnake = self; if (hostConn && hostConn.open) hostConn.send({type:'respawn'}); } document.getElementById('deathOverlay').classList.add('hidden'); running = true; lastTime = performance.now(); requestAnimationFrame(loop); }
