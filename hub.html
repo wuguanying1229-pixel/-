@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>應用中心 - 我的專案</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Noto Sans TC', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .apps-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .app-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .app-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .app-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .app-card h2 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        .app-card p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .app-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .app-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 600px) {
+            .apps-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 應用中心</h1>
+            <p>選擇一個應用開始使用</p>
+        </div>
+
+        <div class="apps-grid">
+            <!-- 貪食蛇遊戲 -->
+            <a href="./neon-arena.html" class="app-card">
+                <div class="app-icon">🎮</div>
+                <h2>NEON ARENA</h2>
+                <p>貪食蛇大作戰<br>與AI對戰，爭奪排行榜第一名</p>
+                <button class="app-btn">進入遊戲</button>
+            </a>
+
+            <!-- 待辦清單 -->
+            <a href="./todo.html" class="app-card">
+                <div class="app-icon">✓</div>
+                <h2>待辦清單</h2>
+                <p>任務管理工具<br>記錄、追蹤和完成你的任務</p>
+                <button class="app-btn">開始使用</button>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>Made with ❤️ | All data stored locally in your browser</p>
+        </div>
+    </div>
+</body>
+</html>
