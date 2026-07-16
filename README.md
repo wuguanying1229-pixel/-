@@ -1,4 +1,4 @@
-https://wuguanying1229-pixel.github.io/-/
+https://wuguanying1229-pixel.github.io/-/(遊玩連結)
 # Neon Arena Web
 
 This project is a single-page browser game that can be served directly from GitHub Pages.
